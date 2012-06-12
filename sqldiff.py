@@ -38,7 +38,7 @@ def diff_tables(db1, db2):
     t2 = set(tables(db2))
 
     if t1.isdisjoint(t2):
-       raise IncomparableDatabases
+       raise NothingToCompare
 
     def dbname(filename):
         return os.path.splitext(os.path.basename(filename))[0]
