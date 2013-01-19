@@ -42,10 +42,12 @@ def parse_criteria(criteria):
                 ('year', '\d{4}' if year == '*' else year)))
 
 
-def get_criteria_pattern(crt):
-    return re.compile(r'^.*\[%s\/%s\/%s.+$' % (crt['day'], 
-                                               crt['month'], 
-                                               crt['year']))
+def get_criteria_pattern(crt, logtype='access'):
+    if logtype == 'error':
+        pattern = re.compile(r'^\[.+\s%s\s%s\s.+\s%s\]\s.+' % (crt['month'], crt['day'], crt['year']))
+    else:
+        pattern = re.compile(r'^.*\[%s\/%s\/%s.+$' % (crt['day'], crt['month'], crt['year']))
+    return pattern
 
 
 def test():
@@ -75,11 +77,15 @@ def handle_subcommand(argv):
 
 if __name__ == '__main__':
     try:
-        script, logfile, criteria = sys.argv
+        logfile, criteria = sys.argv[1:3]
+        try:
+            logtype = sys.argv[3]
+        except IndexError:
+            logtype = 'access'
     except ValueError:
         handle_subcommand(sys.argv)
 
-    pattern = get_criteria_pattern(parse_criteria(criteria))
+    pattern = get_criteria_pattern(parse_criteria(criteria), logtype)
     with open(os.path.abspath(logfile)) as f:
         lines = f
         lines = (line for line in lines if pattern.match(line) is not None)
