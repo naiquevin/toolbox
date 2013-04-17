@@ -23,10 +23,10 @@ pre="backup_"
 dt=`date +'%m-%d-%Y'`
 bdir=`echo $pre$dt`
 `mkdir $bdir`
-for f in `cat tobackup.txt`
+for f in "`cat tobackup.txt`"
 do
     tdir=`echo "$f" | sed -e "s/^\/*//"`
-    tdirname=`dirname $tdir`
-    `mkdir -p $bdir/$tdirname`
-    `cp -r $f ./$bdir/$tdirname/`
+    tdirname=`dirname "$tdir"`
+    `mkdir -p $bdir/"$tdirname"`
+    `cp -r "$f" ./$bdir/"$tdirname"/`
 done
