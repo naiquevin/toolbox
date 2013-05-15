@@ -4,10 +4,17 @@ from fnmatch import fnmatch
 from itertools import groupby
 from functools import wraps
 
+import requests
 import polib
+
 
 # global, expected to be specified in sys.argv
 basedir = None
+
+# edit this before running the code
+mymemory_email = None
+
+lang_code_pattern = re.compile(r'locale/([a-z_A-Z]+)/LC_MESSAGES')
 
 
 def find_pofile_paths(basedir):
@@ -17,14 +24,25 @@ def find_pofile_paths(basedir):
     return pofiles
 
 
+def lang_code_from_path(fpath):
+    m = lang_code_pattern.search(fpath)
+    if m is not None:
+        return m.groups()[0].lower().replace('_', '-')
+    else:
+        raise Exception('Not a locale path')
+
+
+### Code for listing various types of po entries to stdout
+
 def write(grouped_entries):
     for lang, entries in grouped_entries:
-        print
-        print('=== %s ===' % lang)
-        print
-        for entry in entries:
-            print entry
+        if lang != 'en':
             print
+            print('=== %s ===' % lang)
+            print
+            for entry in entries:
+                print entry
+                print
 
 
 def groupby_lang(func):
@@ -35,18 +53,16 @@ def groupby_lang(func):
     return dec
 
 
-def list_command(func):
+def entries(func):
     @wraps(func)
     def dec():
         global basedir
         pofiles = (polib.pofile(f) for f in find_pofile_paths(basedir))
-        write(get_entries(pofiles, func));
+        return get_entries(pofiles, func);
     return dec
 
 
 class WrappedPOEntry(object):
-
-    lang_code_pattern = re.compile(r'locale/([a-z_A-Z]+)/LC_MESSAGES')
 
     def __init__(self, po_entry, fpath):
         self._po_entry = po_entry
@@ -54,14 +70,13 @@ class WrappedPOEntry(object):
 
     @property
     def lang_code(self):
-        m = self.lang_code_pattern.search(self.fpath)
-        if m is not None:
-            return m.groups()[0]
-        else:
-            raise Exception('Not a locale path')
+        return lang_code_from_path(self.fpath)
 
     def __getattr__(self, attr):
         return getattr(self._po_entry, attr)
+
+    def set_trans(self, trans):
+        self._po_entry.msgstr = trans
 
     def __unicode__(self):
         values = {'flags': ','.join(self.flags),
@@ -79,39 +94,133 @@ class WrappedPOEntry(object):
 
 @groupby_lang
 def get_entries(pofiles, pred=None):
-    for po in pofiles:
-        for e in po:
-            if pred is not None and pred(e):
-                yield WrappedPOEntry(e, po.fpath)
+    return (WrappedPOEntry(e, po.fpath)
+            for po in pofiles
+            for e in po
+            if pred is not None and pred(e))
 
 
 def by_fext(entry, fext):
-    return any(os.path.splitext(o[0])[1] == '.py' for o in entry.occurrences)
+    return any(os.path.splitext(o[0])[1] == fext for o in entry.occurrences)
 
 
-@list_command
-def list_non_translated(entry):
+@entries
+def get_non_translated(entry):
     return not entry.translated() and entry.obsolete != 1
 
 
-@list_command
-def list_obsolete(entry):
+@entries
+def get_non_translated_non_fuzzy(entry):
+    return not entry.translated() and entry.obsolete != 1 and 'fuzzy' not in entry.flags
+
+
+@entries
+def get_obsolete(entry):
     return entry.obsolete == 1
 
 
-@list_command
-def list_py_text(entry):
+@entries
+def get_py_text(entry):
     return by_fext(entry, '.py')
 
 
-@list_command
-def list_js_text(entry):
+@entries
+def get_js_text(entry):
     return by_fext(entry, '.js')
 
 
-@list_command
-def list_html_text(entry):
+@entries
+def get_html_text(entry):
     return by_fext(entry, '.js')
+
+
+def list_non_translated():
+    write(get_non_translated())
+
+
+def list_non_translated_non_fuzzy():
+    write(get_non_translated_non_fuzzy())
+
+
+def list_obsolete():
+    write(get_obsolete())
+
+
+### Code for getting translations for text from MyMemory
+### http://mymemory.translated.net/doc/spec.php
+
+class MyMemoryTransError(Exception):
+    pass
+
+
+def mymemory_translate(msgid, to_lang, from_lang='en'):
+    assert mymemory_email is not None, 'Please provide an email to use mymemory api'
+    req = requests.get('http://api.mymemory.translated.net/get',
+                       params={'q': msgid,
+                               'langpair': '%s|%s' % (from_lang, to_lang),
+                               'de': mymemory_email})
+    if req.status_code == 200:
+        return req.json['responseData']['translatedText']
+    else:
+        raise MyMemoryTransError('Request to translate %r failed with status code %d' % (msgid, req.status_code))
+
+
+def translate_non_translated_non_fuzzy():
+    entries = get_non_translated_non_fuzzy()
+    for lang, entries in entries:
+        if lang != 'en':
+            print
+            print('=== %s ===' % lang)
+            print
+            for entry in entries:
+                try:
+                    trans = mymemory_translate(entry.msgid, to_lang=lang)
+                    entry.set_trans(trans)
+                except (MyMemoryTransError, requests.exceptions.RequestException) as e:
+                    print e
+                finally:
+                    print entry
+                    print
+
+
+### Code for writing to the po files. To be used with care.
+
+def remove_fuzzy_flags():
+    pofiles = (polib.pofile(f) for f in find_pofile_paths(basedir))
+    for po in pofiles:
+        num_fuzzy = 0
+        for entry in po.fuzzy_entries():
+            num_fuzzy += 1
+            entry.flags.remove('fuzzy')
+        po.save()
+        if num_fuzzy > 0:
+            print '%d fuzzy flags removed from %s' % (num_fuzzy, po.fpath)
+    print 'DONE!'
+
+
+def translate_new_and_save():
+    pofiles = (polib.pofile(f) for f in find_pofile_paths(basedir))
+    for po in pofiles:
+        num = 0
+        lang = lang_code_from_path(po.fpath)
+        if lang == 'en':
+            continue
+        for entry in po.untranslated_entries():
+            try:
+                trans = mymemory_translate(entry.msgid, to_lang=lang)
+            except (MyMemoryTransError, requests.exceptions.RequestException) as e:
+                print e
+            else:
+                num += 1
+                entry.msgstr = trans
+        po.save()
+        if num > 0:
+            print '%d new translations added to %s' % (num, po.fpath)
+    print 'DONE!'
+
+
+def remove_obsolete():
+    pass # how to do this using polib?
 
 
 if __name__ == '__main__':
