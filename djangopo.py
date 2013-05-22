@@ -1,3 +1,18 @@
+"""A tool to work with language trans files (.po) in a django project
+
+Author: Vineet Naik <naikvin@gmail.com>, <vineet.naik@kodeplay.com>
+
+This script is a utility for working with .po files in a django
+project in which many languages are to be supported and so for any new
+text introduced the translation files for all languages are to be
+updated.
+
+To get translated strings, it uses the mymemory api, more info about
+the same can be obtained from here -
+http://mymemory.translated.net/doc/spec.php
+
+"""
+
 import os
 import re
 from fnmatch import fnmatch
@@ -13,6 +28,8 @@ basedir = None
 
 # edit this before running the code
 mymemory_email = None
+
+_commands = set()
 
 lang_code_pattern = re.compile(r'locale/([a-z_A-Z]+)/LC_MESSAGES')
 
@@ -60,6 +77,12 @@ def entries(func):
         pofiles = (polib.pofile(f) for f in find_pofile_paths(basedir))
         return get_entries(pofiles, func);
     return dec
+
+
+def command(func):
+    global _commands
+    _commands.add((func.__name__, func.__doc__))
+    return func
 
 
 class WrappedPOEntry(object):
@@ -134,14 +157,17 @@ def get_html_text(entry):
     return by_fext(entry, '.js')
 
 
+@command
 def list_non_translated():
     write(get_non_translated())
 
 
+@command
 def list_non_translated_non_fuzzy():
     write(get_non_translated_non_fuzzy())
 
 
+@command
 def list_obsolete():
     write(get_obsolete())
 
@@ -165,6 +191,7 @@ def mymemory_translate(msgid, to_lang, from_lang='en'):
         raise MyMemoryTransError('Request to translate %r failed with status code %d' % (msgid, req.status_code))
 
 
+@command
 def translate_non_translated_non_fuzzy():
     entries = get_non_translated_non_fuzzy()
     for lang, entries in entries:
@@ -185,6 +212,7 @@ def translate_non_translated_non_fuzzy():
 
 ### Code for writing to the po files. To be used with care.
 
+@command
 def remove_fuzzy_flags():
     pofiles = (polib.pofile(f) for f in find_pofile_paths(basedir))
     for po in pofiles:
@@ -198,6 +226,7 @@ def remove_fuzzy_flags():
     print 'DONE!'
 
 
+@command
 def translate_new_and_save():
     pofiles = (polib.pofile(f) for f in find_pofile_paths(basedir))
     for po in pofiles:
@@ -225,7 +254,8 @@ def remove_obsolete():
 
 if __name__ == '__main__':
     import sys
-    script, subcommand, basedir = sys.argv
+    script, subcommand, basedir, email = sys.argv
+    mymemory_email = email
     if locals().get(subcommand) is not None:
         locals().get(subcommand)()
     else:
