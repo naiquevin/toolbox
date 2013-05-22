@@ -3,6 +3,7 @@
 import sys
 import re
 from collections import Counter
+import json
 
 
 requests_pattern = re.compile(r'^.+\s-\s-\s\[.+\]\s"(GET|POST|PUT|UPDATE|HEAD)\s(.+)\sHTTP/1.1"\s200.+$')
@@ -24,8 +25,7 @@ def build_dynamic_pattern(url, pattern):
     match = pattern.match(url)
     if match is not None:
         for k, v in match.groupdict().iteritems():
-            newurl = url.replace(v, '<%s>' % (k,))
-        return newurl
+            url = url.replace(v, '<%s>' % (k,))
     return url
 
 
@@ -40,9 +40,7 @@ def extract_request_urls(lines, dynamic_patterns=None, ignore_qs=True):
     return Counter(groups)
 
 
-def request_urls(logfile):
-    dynamic_patterns = map(re.compile, ['/shopper/(?P<appid>\w+)/chat/',
-                                        '/feedapi/(?P<appid>\w+)/products/'])
+def request_urls(logfile, dynamic_patterns=None):
     with open(logfile) as f:
         url_counter = extract_request_urls(f, dynamic_patterns=dynamic_patterns, ignore_qs=True)
         print 'Total hits: %d' % (sum(url_counter.values()),)
@@ -77,9 +75,11 @@ if __name__ == '__main__':
         test()
     elif subcommand == 'request_urls':
         try:
-            logfile = sys.argv[2]
+            logfile, dp_file = sys.argv[2:]
         except IndexError:
             print 'Help!'
-        request_urls(logfile)
+        else:
+            dynamic_patterns = map(re.compile, json.load(open(dp_file)))
+            request_urls(logfile, dynamic_patterns)
     else:
         print 'Help!'
