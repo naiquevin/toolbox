@@ -67,6 +67,8 @@ def parse_line(line, pattern):
     match = pattern.match(line)
     if match is not None:
         log = match.groupdict()
+        # convert status_code to int
+        log['status_code'] = int(log['status_code'])
         # convert log time to utc timestamp and add to dict
         dt = dateparser.parse(log['datetime'], fuzzy=True)
         log['timestamp'] = datetime_to_timestamp(dt)
