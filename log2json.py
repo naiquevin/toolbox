@@ -10,8 +10,9 @@ For help, run following command in terminal::
 import argparse
 import re
 import sys
-from contextlib import contextmanager
 import json
+
+import cli
 
 
 LOG_PATTERNS = {
@@ -28,29 +29,6 @@ LOG_PATTERNS = {
         r'"(?P<user_agent>.+)"$'
     ),
 }
-
-
-@contextmanager
-def source(filepath, stdin):
-    """Contextmanager that gets a file like object as source
-
-    If filepath is not None, then it will open the file and return the
-    file object. In the end, takes care of closing it. Reads standard
-    input if stdin is True Raises an exception if both above cases
-    fail
-
-    """
-    if filepath is not None:
-        f = open(filepath)
-        yield f
-        f.close()
-    elif stdin:
-        yield sys.stdin.readlines()
-    else:
-        raise argparse.ArgumentError(args.filepath, (
-            'At least one of log file path or'
-            'input from stdin is required'
-        ))
 
 
 def get_pattern(pattern_arg):
@@ -87,10 +65,13 @@ def parse_line(line, pattern):
 def convert(args):
     """The `convert` subcommand"""
     pattern = get_pattern(args.pattern)
-    with source(args.filepath, args.stdin) as lines:
-        sys.stdout.write(json.dumps([parse_line(line, pattern)
-                                     for line in lines
-                                     if line.strip() != '']))
+    try:
+        with cli.read_input(args.filepath, args.stdin) as lines:
+            sys.stdout.write(json.dumps([parse_line(line, pattern)
+                                         for line in lines
+                                         if line.strip() != '']))
+    except cli.CliError as e:
+        raise argparse.ArgumentError(args.filepath, str(e))
 
 
 def list_patterns(args):
