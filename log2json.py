@@ -6,13 +6,14 @@ For help, run following command in terminal::
 
 """
 
-
+import datetime
 import argparse
 import re
 import sys
 import json
 
 import cli
+from dateutil import tz, parser as dateparser
 
 
 LOG_PATTERNS = {
@@ -48,6 +49,14 @@ def get_pattern(pattern_arg):
         return re.compile(pattern_arg)
 
 
+def datetime_to_timestamp(dt):
+    """Converts a utc timezone aware datetime object to utc timestamp
+
+    """
+    epoch = datetime.datetime(1970, 1, 1).replace(tzinfo=tz.tzutc())
+    return (dt - epoch).total_seconds()
+
+
 def parse_line(line, pattern):
     """Parses a single line using pattern
 
@@ -57,7 +66,11 @@ def parse_line(line, pattern):
     """
     match = pattern.match(line)
     if match is not None:
-        return match.groupdict()
+        log = match.groupdict()
+        # convert log time to utc timestamp and add to dict
+        dt = dateparser.parse(log['datetime'], fuzzy=True)
+        log['timestamp'] = datetime_to_timestamp(dt)
+        return log
     else:
         pass # do logging here
 
