@@ -23,7 +23,7 @@ LOG_PATTERNS = {
         r'\[(?P<datetime>.+)\]\s'
         r'"(?P<method>(GET|POST|PUT|UPDATE|HEAD))\s'
         r'(?P<path>.+)\s'
-        r'HTTP/1.1"\s'
+        r'HTTP/(?P<http_ver>(1.1|1.0))"\s'
         r'(?P<status_code>\d{3})\s'
         r'(?P<content_size>\d+)\s'
         r'"(?P<referrer>.+)"\s'
