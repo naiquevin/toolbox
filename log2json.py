@@ -50,9 +50,7 @@ def get_pattern(pattern_arg):
 
 
 def datetime_to_timestamp(dt):
-    """Converts a utc timezone aware datetime object to utc timestamp
-
-    """
+    """Converts a utc timezone aware datetime object to utc timestamp"""
     epoch = datetime.datetime(1970, 1, 1).replace(tzinfo=tz.tzutc())
     return (dt - epoch).total_seconds()
 
@@ -74,7 +72,7 @@ def parse_line(line, pattern):
         log['timestamp'] = datetime_to_timestamp(dt)
         return log
     else:
-        pass # do logging here
+        return None # throw some warning here may be
 
 
 def convert(args):
@@ -82,9 +80,11 @@ def convert(args):
     pattern = get_pattern(args.pattern)
     try:
         with cli.read_input(args.filepath, args.stdin) as lines:
-            sys.stdout.write(json.dumps([parse_line(line, pattern)
-                                         for line in lines
-                                         if line.strip() != '']))
+            logs = (parse_line(line, pattern)
+                    for line in lines
+                    if line.strip() != '')
+            sys.stdout.write(json.dumps([log for log in logs if log is
+                                         not None]))
     except cli.CliError as e:
         raise argparse.ArgumentError(args.filepath, str(e))
 
