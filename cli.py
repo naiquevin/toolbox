@@ -31,7 +31,7 @@ def read_input(filepath, stdin):
         yield f
         f.close()
     elif stdin:
-        yield sys.stdin.readlines()
+        yield sys.stdin
     else:
         raise CliError(
             'At least one of log file path or'
