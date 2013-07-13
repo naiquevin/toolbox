@@ -102,7 +102,7 @@ def list_patterns(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('subcommand', help='subcommand',
+    parser.add_argument('subcommand', help='subcommand ( convert | list_patterns )',
                         nargs='?', default='convert')
     parser.add_argument('-f', '--filepath',
                         help='path to the log file')
