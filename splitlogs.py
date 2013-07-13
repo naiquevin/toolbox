@@ -42,8 +42,22 @@ def get_date_pattern(date_pattern, log_type='apache2_access'):
     return re.compile(LOG_PATTERN_FORMATS[log_type].format(**date_pattern))
 
 
+def split(f, pattern):
+    return (line for line in f  if pattern.match(line) is not None)
+
+
+def main(args):
+    pattern = get_date_pattern(parse_date(args.date), args.log_type)
+
+    try:
+        with cli.read_input(args.filepath, args.stdin) as f:
+            print ''.join(split(f, pattern))
+    except cli.CliError as e:
+        raise argparse.ArgumentError(args.filepath, str(e))
+
+
 def test():
-    """Run tests"""
+    """Tests (Use nosetests to run them)"""
     c = parse_date('*/nov/*')
     assert c['day'] == '\d{2}'
     assert c['month'] == 'Nov'
@@ -53,23 +67,8 @@ def test():
     log = '183.82.25.178 - - [08/Nov/2012:13:15:05 +0000] "GET /favicon.ico HTTP/1.1" 404 503 "-" "Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:16.0) Gecko/20100101 Firefox/16.0"'
     assert cp.match(log) is not None
 
-    print 'tests: ok'
-
-
-def split(args):
-    pattern = get_date_pattern(parse_date(args.date), args.log_type)
-
-    try:
-        with cli.read_input(args.filepath, args.stdin) as f:
-            print ''.join(line for
-                          line in f
-                          if pattern.match(line) is not None)
-    except cli.CliError as e:
-        raise argparse.ArgumentError(args.filepath, str(e))
-
 
 if __name__ == '__main__':
-    # test()
     parser = argparse.ArgumentParser()
     parser.add_argument('date', help='Wild card pattern for date eg. 06/Nov/*, */Nov/*')
     parser.add_argument('-f', '--filepath',
@@ -84,5 +83,5 @@ if __name__ == '__main__':
                         choices=LOG_PATTERN_FORMATS.keys())
 
     args = parser.parse_args()
-    split(args)
+    main(args)
 
