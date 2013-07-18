@@ -1,12 +1,14 @@
 """A simple CSV to JSON converter
 
-Usage: dopt.py (-i | FILE) [-q QUOTECHAR -d DELIMITER]
-       dopt.py -h | --help | --version
+Usage: csv2json.py ( -i | FILE ) [ -q QUOTECHAR -d DELIMITER ]
+       csv2json.py -h | --help | --version
 
 Options:
+    -i            Read from stdin
+    -d DELIMITER  Specify csv delimiter [default: ,]
+    -q QUOTECHAR  Specify csv quotechar [default: |]
     -h --help     Show help
-    -d DELIMITER  specify csv delimiter [default: ,]
-    -q QUOTECHAR  specify csv quotechar [default: |]
+    --version     Show version
 
 """
 
