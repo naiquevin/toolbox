@@ -33,8 +33,5 @@ def read_input(filepath, stdin):
     elif stdin:
         yield sys.stdin
     else:
-        raise CliError(
-            'At least one of log file path or'
-            'input from stdin is required'
-        )
+        raise CliError('Either filepath or stdin required')
 
