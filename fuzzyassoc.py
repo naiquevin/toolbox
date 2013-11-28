@@ -51,6 +51,7 @@ def lines_to_keymap(lines):
             line = line.strip()
             current = acc['current']
             if current is not None:
+                acc['keymap'].pop(current, None)
                 acc['keymap'][line] = current
                 return acc
             else:
