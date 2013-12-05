@@ -49,7 +49,7 @@ def cache_image(url, path, size):
         image.thumbnail(size, Image.NEAREST)
         path = path + get_image_name(url)
         print path
-        if image.size[0] > size[0] or image.size[1] > size[1]:
+        if image.size[0] < size[0] or image.size[1] < size[1]:
             background = Image.new('RGBA', size, (255, 255, 255, 0))
             background.paste(image,
                              ((size[0] - image.size[0]) / 2, (size[1] - image.size[1]) / 2))
