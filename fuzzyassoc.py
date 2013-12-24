@@ -1,7 +1,7 @@
 """Dictionary-key association with fuzzy matching
 
 Usage: fuzzyassoc.py match DATAFILE KEYSFILE [-r FUZZYRATIO]
-       fuzzyassoc.py assoc DATAFILE KEYSFILE
+       fuzzyassoc.py assoc DATAFILE MATCHFILE
        fuzzyassoc.py -h | --help | --version
 
 Options:
@@ -68,9 +68,9 @@ def assoc_by_matches(data, keymap):
     return {k: data[v] for k, v in keymap.iteritems() if data[v] is not None}
 
 
-def cmd_assoc(datafile, keymapfile):
+def cmd_assoc(datafile, matchfile):
     print(json.dumps(assoc_by_matches(json.load(open(datafile)),
-                                      lines_to_keymap(open(keymapfile))),
+                                      lines_to_keymap(open(matchfile))),
                      indent=4))
 
 
@@ -79,7 +79,7 @@ def main(args):
         if args['match']:
             cmd_match(args['DATAFILE'], args['KEYSFILE'], int(args['-r']))
         elif args['assoc']:
-            cmd_assoc(args['DATAFILE'], args['KEYSFILE'])
+            cmd_assoc(args['DATAFILE'], args['MATCHFILE'])
     except:
         return 1
     else:
