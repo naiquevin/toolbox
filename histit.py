@@ -30,14 +30,14 @@ def plot_hist(data, title, xlabel, bins):
     return plt
 
 
-def coerce_lines(lines, datatype):
+def cast_to_type(lines, datatype):
     f = {'int': int, 'float': float}[datatype]
     return (f(x) for x in lines)
 
 
 def main(args):
     with read_input(args['FILE'], args['-i']) as f:
-        data = coerce_lines(f, args['--datatype'])
+        data = cast_to_type(f, args['--datatype'])
         plt = plot_hist(data, args['--title'], args['--xlabel'], int(args['--bins']))
         if args['show']:
             plt.show()
