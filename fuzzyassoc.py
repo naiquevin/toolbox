@@ -5,7 +5,7 @@ Usage: fuzzyassoc.py match DATAFILE KEYSFILE [-r FUZZYRATIO]
        fuzzyassoc.py -h | --help | --version
 
 Options:
-    -r FUZZYRATIO  specify csv delimiter [default: 80]
+    -r FUZZYRATIO  fuzzy matching ratio threshold [default: 80]
     -h --help      Show help
     --version      Show version
 """
