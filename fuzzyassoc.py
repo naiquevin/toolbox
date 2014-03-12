@@ -10,14 +10,40 @@ Options:
     --version      Show version
 """
 
+from itertools import chain
+
+import os
 import json
+import yaml
 
 from fuzzywuzzy import process
 from docopt import docopt
 
 
-def fuzzy_match_keys(data, keys, ratio_threshold):
-    newkeys = data.keys()
+def getext(fp):
+    return os.path.splitext(fp)[1]
+
+
+def read_data(fp):
+    ext = getext(fp)
+    if ext == '.json':
+        return json.load(open(fp))
+    elif ext in ['.yaml', '.yml']:
+        return yaml.load(open(fp))
+    else:
+        raise Exception('Unsupported format: "{}"'.format(ext))
+
+
+def write_data(data, ext):
+    if ext == '.json':
+        return json.dumps(data, indent=4)
+    elif ext in ['.yaml', '.yml']:
+        return yaml.dump(data, default_flow_style=False)
+    else:
+        raise Exception('Unsupported format: "{}"'.format(ext))
+
+
+def fuzzy_match_keys(newkeys, keys, ratio_threshold):
     keys_set = set(keys)
     newkeys_set = set(newkeys)
     samekeys = keys_set.intersection(newkeys_set)
@@ -30,48 +56,23 @@ def fuzzy_match_keys(data, keys, ratio_threshold):
 
 
 def cmd_match(datafile, keysfile, ratio_threshold=80):
-    data = json.load(open(datafile))
+    data = read_data(datafile)
     keys = [line.strip() for line in open(keysfile)]
-    samekeys, diffkeymap = fuzzy_match_keys(data, keys, ratio_threshold)
-    for k in samekeys:
-        print(k)
-    print('---')
-    for nk, matches in diffkeymap:
-        print(nk)
-        for m in matches:
-            print(' '*4 + m)
+    samekeys, diffkeymap = fuzzy_match_keys(data.keys(), keys, ratio_threshold)
+    result = {k: [k] for k in samekeys}
+    result.update({str(k): map(str, v) for k, v in diffkeymap})
+    print(write_data(result, getext(datafile)))
 
 
-def lines_to_keymap(lines):
-    def loop(acc, line):
-        if line.startswith('---'):
-            acc['current'] = None
-            return acc
-        if line.startswith(' '*4):
-            line = line.strip()
-            current = acc['current']
-            if current is not None:
-                acc['keymap'].pop(current, None)
-                acc['keymap'][line] = current
-                return acc
-            else:
-                raise Exception('Bad format: {}'.format(line))
-        else:
-            line = line.strip()
-            acc['keymap'][line] = line
-            acc['current'] = line
-            return acc
-    return reduce(loop, lines, {'keymap': {}, 'current': None})['keymap']
-
-
-def assoc_by_matches(data, keymap):
-    return {k: data[v] for k, v in keymap.iteritems() if data[v] is not None}
+def assoc_by_matches(data, matches):
+    keymap = chain.from_iterable([(x, k) for x in v] for k, v in matches.iteritems())
+    return {k: data[v] for k, v in keymap if data[v] is not None}
 
 
 def cmd_assoc(datafile, matchfile):
-    print(json.dumps(assoc_by_matches(json.load(open(datafile)),
-                                      lines_to_keymap(open(matchfile))),
-                     indent=4))
+    print(write_data(assoc_by_matches(read_data(datafile),
+                                      read_data(matchfile)),
+                     getext(datafile)))
 
 
 def main(args):
