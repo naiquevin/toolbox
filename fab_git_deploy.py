@@ -15,8 +15,11 @@ and push code.
 """
 
 from functools import wraps
-from fabric.api import local, env, task
+from fabric.api import local, env, task, settings, cd, prefix, run
 from fabric.colors import yellow, red, green
+
+
+env.use_ssh_config = True
 
 
 @task
@@ -32,6 +35,10 @@ def staging(branch):
     env.from_branch = branch # branch from which to upload code
     env.tracking_branch = 'to-staging' # this tracking branch is assumed to be set
     env.remote = 'staging' # git remote for this env
+    env.remote_dir = '/path/to/dir/on/remote'
+    env.venv_name = 'myproject'
+    env.deploy_log_file = '/path/to/deploys.log'
+    env.committer = committer_signature()
     local('git checkout %s' % env.from_branch)
 
 
@@ -77,24 +84,45 @@ def prepare_deploy():
 @env_required
 def deploy():
     """Deploy the code"""
-    backup_code()
     local("git checkout %s" % env.tracking_branch)
     local("git pull")
+    old_commit = current_commit_hash()
     local("git merge %s" % env.from_branch)
+    new_commit = current_commit_hash()
     local("git push %s" % env.remote)
     local("git checkout %s" % env.from_branch)
-    prompt_next(post_deploy)
+    prompt_next(post_deploy, old_commit=old_commit, new_commit=new_commit)
 
 
 @task
 @env_required
-def post_deploy():
+def post_deploy(old_commit=None, new_commit=None):
     """Set of tasks to be done post deployment
 
     eg. Running db migrations etc.
     """
     print(green('Executing post deployment tasks'))
-    # add code here
+    with cd(env.remote_dir), prefix('. /usr/local/bin/virtualenvwrapper.sh; workon {}'.format(env.venv_name)):
+        # run commands such as django's migrations, collectstatic or
+        # any other commands depending upon the framework here. Also,
+        # don't forget to touch the uwsgi.ini (uwsgi+nginx) or wsgi.py
+        # (apache2+mod_wsgi) file add code as applicable
+
+        # finally update the deploy logs ie. append a line to the
+        # deploy log file with info such as when and by whom the code
+        # was deployed as well as the old and new commit hashes (can
+        # be helpful in case code needs to be rolled back to previous
+        # stable state)
+        if old_commit != new_commit:
+            run((
+                'echo "{old_commit} -> {new_commit}'
+                ' by {committer}'
+                ' at `date`"'
+                ' >> {deploy_log}'
+            ).format(old_commit=old_commit,
+                     new_commit=new_commit,
+                     committer=env.committer,
+                     deploy_log=env.deploy_log_file))
 
 
 @task
@@ -104,15 +132,23 @@ def test():
     # call the test command here appropriately
 
 
-@task
-@env_required
-def backup_code():
-    """Backup code on the server"""
-    print(yellow('Taking a backup on the server before uploading new code (todo)'))
-    # code to take backup
+def is_work_tree_dirty():
+    with settings(warn_only=True):
+        result = local('git diff --quiet')
+        return result.return_code == 1
 
 
-def prompt_next(func, args=None, kwargs=None):
+def current_commit_hash():
+    return local("git rev-parse --short HEAD", capture=True)
+
+
+def committer_signature():
+    name = local("git config user.name", capture=True)
+    email = local("git config user.email", capture=True)
+    return '{} <{}>'.format(name, email)
+
+
+def prompt_next(func, **kwargs):
     """Function to chain together various tasks. The user is prompted
     whether to execute the next task in line
     """
@@ -121,6 +157,6 @@ def prompt_next(func, args=None, kwargs=None):
     ques = "Proceed to the next step (%s)? [y/n] " % (func_name,)
     ans = raw_input(ques)
     if ans in ('y', 'Y'):
-        func()
+        func(**kwargs)
     else:
         print(red('You chose to stop! Please run the next steps manually to complete deployment'))
